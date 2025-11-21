@@ -1,0 +1,142 @@
+// Jenkinsfile for Windows Jenkins
+// This version uses bat commands instead of sh for Windows compatibility
+
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_IMAGE = 'todo-reduxtoolkit'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        CONTAINER_NAME = 'todo-reduxtoolkit-app'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "Checking out code from repository..."
+                    checkout scm
+                    // Show current directory to debug
+                    bat '''
+                        echo Current directory:
+                        cd
+                        echo Files:
+                        dir
+                    '''
+                }
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    echo "Installing dependencies..."
+                    bat '''
+                        call npm ci
+                        if errorlevel 1 exit /b 1
+                    '''
+                }
+            }
+        }
+        
+        stage('Lint') {
+            steps {
+                script {
+                    echo "Running ESLint..."
+                    bat '''
+                        call npm run lint || echo Lint completed with warnings
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Application') {
+            steps {
+                script {
+                    echo "Building React application..."
+                    bat '''
+                        call npm run build
+                        if errorlevel 1 exit /b 1
+                    '''
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'dist/**/*', fingerprint: true
+                }
+            }
+        }
+        
+        stage('Docker Build') {
+            steps {
+                script {
+                    echo "Building Docker image..."
+                    bat '''
+                        docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
+                        if errorlevel 1 exit /b 1
+                        docker tag %DOCKER_IMAGE%:%DOCKER_TAG% %DOCKER_IMAGE%:latest
+                    '''
+                }
+            }
+        }
+        
+        stage('Stop Old Container') {
+            steps {
+                script {
+                    echo "Stopping old container if exists..."
+                    bat '''
+                        docker stop %CONTAINER_NAME% 2>nul || echo Container not running
+                        docker rm %CONTAINER_NAME% 2>nul || echo Container not found
+                    '''
+                }
+            }
+        }
+        
+        stage('Run Container') {
+            steps {
+                script {
+                    echo "Running new container..."
+                    bat '''
+                        docker run -d --name %CONTAINER_NAME% -p 3000:80 --restart unless-stopped %DOCKER_IMAGE%:%DOCKER_TAG%
+                        if errorlevel 1 exit /b 1
+                    '''
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    echo "Checking container health..."
+                    bat '''
+                        timeout /t 5 /nobreak >nul
+                        docker ps | findstr %CONTAINER_NAME%
+                        curl -f http://localhost:3000/health 2>nul || curl -f http://localhost:3000/ 2>nul || echo Health check skipped
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                echo "Cleaning up workspace..."
+                bat '''
+                    docker image prune -f || echo Cleanup skipped
+                '''
+            }
+        }
+        success {
+            echo "✅ Pipeline completed successfully!"
+            echo "🌐 Application is running at: http://localhost:3000"
+        }
+        failure {
+            echo "❌ Pipeline failed! Check logs above."
+        }
+        cleanup {
+            cleanWs()
+        }
+    }
+}
+

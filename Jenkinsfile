@@ -1,5 +1,5 @@
-// Jenkinsfile for React Redux Toolkit Todo App
-// This file should be at the root of your repository
+// Jenkinsfile - Cross-platform (Windows/Linux)
+// Uses bat for Windows, sh for Linux
 
 pipeline {
     agent any
@@ -17,8 +17,11 @@ pipeline {
                     echo "Checking out code from repository..."
                     checkout scm
                     // Show current directory to debug
-                    sh 'pwd'
-                    sh 'ls -la'
+                    if (isUnix()) {
+                        sh 'pwd && ls -la'
+                    } else {
+                        bat 'cd && dir'
+                    }
                 }
             }
         }
@@ -27,9 +30,16 @@ pipeline {
             steps {
                 script {
                     echo "Installing dependencies..."
-                    sh '''
-                        npm ci
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            npm ci
+                        '''
+                    } else {
+                        bat '''
+                            call npm ci
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
                 }
             }
         }
@@ -38,9 +48,15 @@ pipeline {
             steps {
                 script {
                     echo "Running ESLint..."
-                    sh '''
-                        npm run lint || true
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            npm run lint || true
+                        '''
+                    } else {
+                        bat '''
+                            call npm run lint || echo Lint completed with warnings
+                        '''
+                    }
                 }
             }
         }
@@ -49,9 +65,16 @@ pipeline {
             steps {
                 script {
                     echo "Building React application..."
-                    sh '''
-                        npm run build
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            npm run build
+                        '''
+                    } else {
+                        bat '''
+                            call npm run build
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
                 }
             }
             post {
@@ -65,10 +88,18 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker image..."
-                    sh '''
-                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                        '''
+                    } else {
+                        bat '''
+                            docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
+                            if errorlevel 1 exit /b 1
+                            docker tag %DOCKER_IMAGE%:%DOCKER_TAG% %DOCKER_IMAGE%:latest
+                        '''
+                    }
                 }
             }
         }
@@ -77,10 +108,17 @@ pipeline {
             steps {
                 script {
                     echo "Stopping old container if exists..."
-                    sh '''
-                        docker stop ${CONTAINER_NAME} || true
-                        docker rm ${CONTAINER_NAME} || true
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            docker stop ${CONTAINER_NAME} || true
+                            docker rm ${CONTAINER_NAME} || true
+                        '''
+                    } else {
+                        bat '''
+                            docker stop %CONTAINER_NAME% 2>nul || echo Container not running
+                            docker rm %CONTAINER_NAME% 2>nul || echo Container not found
+                        '''
+                    }
                 }
             }
         }
@@ -89,9 +127,16 @@ pipeline {
             steps {
                 script {
                     echo "Running new container..."
-                    sh '''
-                        docker run -d --name ${CONTAINER_NAME} -p 3000:80 --restart unless-stopped ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            docker run -d --name ${CONTAINER_NAME} -p 3000:80 --restart unless-stopped ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        '''
+                    } else {
+                        bat '''
+                            docker run -d --name %CONTAINER_NAME% -p 3000:80 --restart unless-stopped %DOCKER_IMAGE%:%DOCKER_TAG%
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
                 }
             }
         }
@@ -100,11 +145,19 @@ pipeline {
             steps {
                 script {
                     echo "Checking container health..."
-                    sh '''
-                        sleep 5
-                        docker ps | grep ${CONTAINER_NAME} || true
-                        curl -f http://localhost:3000/health || curl -f http://localhost:3000/ || true
-                    '''
+                    if (isUnix()) {
+                        sh '''
+                            sleep 5
+                            docker ps | grep ${CONTAINER_NAME}
+                            curl -f http://localhost:3000/health || curl -f http://localhost:3000/ || true
+                        '''
+                    } else {
+                        bat '''
+                            timeout /t 5 /nobreak >nul
+                            docker ps | findstr %CONTAINER_NAME%
+                            curl -f http://localhost:3000/health 2>nul || curl -f http://localhost:3000/ 2>nul || echo Health check skipped
+                        '''
+                    }
                 }
             }
         }
@@ -114,9 +167,11 @@ pipeline {
         always {
             script {
                 echo "Cleaning up workspace..."
-                sh '''
-                    docker image prune -f || true
-                '''
+                if (isUnix()) {
+                    sh 'docker image prune -f || true'
+                } else {
+                    bat 'docker image prune -f || echo Cleanup skipped'
+                }
             }
         }
         success {
