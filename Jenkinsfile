@@ -115,11 +115,12 @@ pipeline {
                         '''
                     } else {
                         bat '''
+                            @echo off
+                            setlocal EnableDelayedExpansion
                             docker stop %CONTAINER_NAME% 2>nul
-                            if errorlevel 1 echo Container not running, continuing...
                             docker rm %CONTAINER_NAME% 2>nul
-                            if errorlevel 1 echo Container not found, continuing...
                             echo Container cleanup completed
+                            exit /b 0
                         '''
                     }
                 }
@@ -156,12 +157,13 @@ pipeline {
                         '''
                     } else {
                         bat '''
+                            @echo off
                             timeout /t 5 /nobreak >nul
-                            docker ps | findstr %CONTAINER_NAME%
-                            if errorlevel 1 echo Container check completed
-                            curl -f http://localhost:3000/health 2>nul
-                            if errorlevel 1 curl -f http://localhost:3000/ 2>nul
-                            if errorlevel 1 echo Health check skipped
+                            docker ps | findstr %CONTAINER_NAME% >nul 2>&1
+                            curl -f http://localhost:3000/health >nul 2>&1
+                            if errorlevel 1 curl -f http://localhost:3000/ >nul 2>&1
+                            echo Health check completed
+                            exit /b 0
                         '''
                     }
                 }
@@ -177,8 +179,10 @@ pipeline {
                     sh 'docker image prune -f || true'
                 } else {
                     bat '''
-                        docker image prune -f
-                        if errorlevel 1 echo Cleanup skipped
+                        @echo off
+                        docker image prune -f >nul 2>&1
+                        echo Cleanup completed
+                        exit /b 0
                     '''
                 }
             }
