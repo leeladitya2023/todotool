@@ -6,11 +6,12 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files (including package-lock.json for npm ci)
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production=false
+# npm ci requires package-lock.json and installs faster
+RUN npm ci
 
 # Copy source code
 COPY . .
