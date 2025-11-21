@@ -26,4 +26,11 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // Disable react-refresh rule for Redux slice files
+    files: ['**/*Slice.jsx', '**/*Slice.js'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

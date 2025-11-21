@@ -54,7 +54,7 @@ pipeline {
                         '''
                     } else {
                         bat '''
-                            call npm run lint || echo Lint completed with warnings
+                            call npm run lint || exit /b 0
                         '''
                     }
                 }
