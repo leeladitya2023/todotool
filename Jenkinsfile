@@ -104,41 +104,24 @@ pipeline {
             }
         }
         
-        stage('Stop Old Container') {
-            steps {
-                script {
-                    echo "Stopping old container if exists..."
-                    if (isUnix()) {
-                        sh '''
-                            docker stop ${CONTAINER_NAME} || true
-                            docker rm ${CONTAINER_NAME} || true
-                        '''
-                    } else {
-                        bat '''
-                            @echo off
-                            setlocal EnableDelayedExpansion
-                            docker stop %CONTAINER_NAME% 2>nul
-                            docker rm %CONTAINER_NAME% 2>nul
-                            echo Container cleanup completed
-                            exit /b 0
-                        '''
-                    }
-                }
-            }
-        }
-        
         stage('Run Container') {
             steps {
                 script {
-                    echo "Running new container..."
+                    echo "Stopping old container if exists and running new container..."
                     if (isUnix()) {
                         sh '''
+                            docker stop ${CONTAINER_NAME} 2>/dev/null || true
+                            docker rm ${CONTAINER_NAME} 2>/dev/null || true
                             docker run -d --name ${CONTAINER_NAME} -p 3000:80 --restart unless-stopped ${DOCKER_IMAGE}:${DOCKER_TAG}
                         '''
                     } else {
                         bat '''
+                            @echo off
+                            docker stop %CONTAINER_NAME% 2>nul
+                            docker rm %CONTAINER_NAME% 2>nul
                             docker run -d --name %CONTAINER_NAME% -p 3000:80 --restart unless-stopped %DOCKER_IMAGE%:%DOCKER_TAG%
                             if errorlevel 1 exit /b 1
+                            echo Container started successfully
                         '''
                     }
                 }
