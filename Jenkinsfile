@@ -117,10 +117,13 @@ pipeline {
                     } else {
                         bat '''
                             @echo off
-                            docker stop %CONTAINER_NAME% 2>nul
-                            docker rm %CONTAINER_NAME% 2>nul
+                            docker stop %CONTAINER_NAME% >nul 2>&1
+                            docker rm %CONTAINER_NAME% >nul 2>&1
                             docker run -d --name %CONTAINER_NAME% -p 3000:80 --restart unless-stopped %DOCKER_IMAGE%:%DOCKER_TAG%
-                            if errorlevel 1 exit /b 1
+                            if errorlevel 1 (
+                                echo Failed to start container
+                                exit /b 1
+                            )
                             echo Container started successfully
                         '''
                     }
