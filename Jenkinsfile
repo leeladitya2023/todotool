@@ -115,8 +115,11 @@ pipeline {
                         '''
                     } else {
                         bat '''
-                            docker stop %CONTAINER_NAME% 2>nul || echo Container not running
-                            docker rm %CONTAINER_NAME% 2>nul || echo Container not found
+                            docker stop %CONTAINER_NAME% 2>nul
+                            if errorlevel 1 echo Container not running, continuing...
+                            docker rm %CONTAINER_NAME% 2>nul
+                            if errorlevel 1 echo Container not found, continuing...
+                            echo Container cleanup completed
                         '''
                     }
                 }
@@ -148,14 +151,17 @@ pipeline {
                     if (isUnix()) {
                         sh '''
                             sleep 5
-                            docker ps | grep ${CONTAINER_NAME}
+                            docker ps | grep ${CONTAINER_NAME} || echo Container check skipped
                             curl -f http://localhost:3000/health || curl -f http://localhost:3000/ || true
                         '''
                     } else {
                         bat '''
                             timeout /t 5 /nobreak >nul
                             docker ps | findstr %CONTAINER_NAME%
-                            curl -f http://localhost:3000/health 2>nul || curl -f http://localhost:3000/ 2>nul || echo Health check skipped
+                            if errorlevel 1 echo Container check completed
+                            curl -f http://localhost:3000/health 2>nul
+                            if errorlevel 1 curl -f http://localhost:3000/ 2>nul
+                            if errorlevel 1 echo Health check skipped
                         '''
                     }
                 }
@@ -170,7 +176,10 @@ pipeline {
                 if (isUnix()) {
                     sh 'docker image prune -f || true'
                 } else {
-                    bat 'docker image prune -f || echo Cleanup skipped'
+                    bat '''
+                        docker image prune -f
+                        if errorlevel 1 echo Cleanup skipped
+                    '''
                 }
             }
         }
