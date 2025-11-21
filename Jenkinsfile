@@ -107,14 +107,16 @@ pipeline {
         stage('Run Container') {
             steps {
                 script {
-                    echo "Running new container..."
+                    echo "Removing old container if exists and running new container..."
                     if (isUnix()) {
                         sh '''
+                            docker rm -f ${CONTAINER_NAME} 2>/dev/null || true
                             docker run -d --name ${CONTAINER_NAME} -p 3000:80 --restart unless-stopped ${DOCKER_IMAGE}:${DOCKER_TAG}
                         '''
                     } else {
                         bat '''
                             @echo off
+                            docker rm -f %CONTAINER_NAME% >nul 2>&1
                             docker run -d --name %CONTAINER_NAME% -p 3000:80 --restart unless-stopped %DOCKER_IMAGE%:%DOCKER_TAG%
                             if errorlevel 1 (
                                 echo Failed to start container
