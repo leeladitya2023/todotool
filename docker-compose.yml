@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  todo-reduxtoolkit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: todo-reduxtoolkit:latest
+    container_name: todo-reduxtoolkit-app
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+    labels:
+      - "com.example.app=todo-reduxtoolkit"
+      - "com.example.version=latest"
+
+networks:
+  app-network:
+    driver: bridge
+
